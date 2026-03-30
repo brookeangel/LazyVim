@@ -5,6 +5,9 @@ return {
   desc = "Better Yank/Paste",
   event = "LazyFile",
   opts = {
+    system_clipboard = {
+      sync_with_ring = not vim.env.SSH_CONNECTION,
+    },
     highlight = { timer = 150 },
   },
   keys = {
@@ -13,6 +16,8 @@ return {
       function()
         if LazyVim.pick.picker.name == "telescope" then
           require("telescope").extensions.yank_history.yank_history({})
+        elseif LazyVim.pick.picker.name == "snacks" then
+          Snacks.picker.yanky()
         else
           vim.cmd([[YankyRingHistory]])
         end

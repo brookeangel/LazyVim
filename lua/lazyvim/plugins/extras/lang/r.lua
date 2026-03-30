@@ -2,7 +2,7 @@ return {
   recommended = function()
     return LazyVim.extras.wants({
       ft = "r",
-      root = { "*.R", "*.Rmd", "*qmd" },
+      root = { "*.R", "*.Rmd", "*.qmd" },
     })
   end,
   {
@@ -17,11 +17,12 @@ return {
           -- of files supported by R.nvim. This is an
           -- opportunity to create mappings local to buffers.
           vim.keymap.set("n", "<Enter>", "<Plug>RDSendLine", { buffer = true })
-          vim.keymap.set("v", "<Enter>", "<Plug>RSendSelection", { buffer = true })
+          vim.keymap.set("x", "<Enter>", "<Plug>RSendSelection", { buffer = true })
 
           local wk = require("which-key")
           wk.add({
             buffer = true,
+            mode = { "n", "x" },
             { "<localleader>a", group = "all" },
             { "<localleader>b", group = "between marks" },
             { "<localleader>c", group = "chunks" },
@@ -64,11 +65,7 @@ return {
     opts = {
       servers = {
         r_language_server = {
-          root_dir = function(fname)
-            return require("lspconfig.util").root_pattern("DESCRIPTION", "NAMESPACE", ".Rbuildignore")(fname)
-              or require("lspconfig.util").find_git_ancestor(fname)
-              or vim.loop.os_homedir()
-          end,
+          root_markers = { "DESCRIPTION", "NAMESPACE", ".Rbuildignore" },
         },
       },
     },

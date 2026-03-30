@@ -6,10 +6,6 @@ if lazyvim_docs then
 end
 
 local lsp = vim.g.lazyvim_ruby_lsp or "ruby_lsp"
-if vim.fn.has("nvim-0.10") == 0 then
-  -- ruby_lsp does not work well with Neovim < 0.10
-  lsp = vim.g.lazyvim_ruby_lsp or "solargraph"
-end
 local formatter = vim.g.lazyvim_ruby_formatter or "rubocop"
 
 return {
@@ -25,9 +21,8 @@ return {
   },
   {
     "neovim/nvim-lspconfig",
-    ---@class PluginLspOpts
+    ---@type PluginLspOpts
     opts = {
-      ---@type lspconfig.options
       servers = {
         ruby_lsp = {
           enabled = lsp == "ruby_lsp",
@@ -36,7 +31,10 @@ return {
           enabled = lsp == "solargraph",
         },
         rubocop = {
-          enabled = formatter == "rubocop",
+          -- If Solargraph and Rubocop are both enabled as an LSP,
+          -- diagnostics will be duplicated because Solargraph
+          -- already calls Rubocop if it is installed
+          enabled = formatter == "rubocop" and lsp ~= "solargraph",
         },
         standardrb = {
           enabled = formatter == "standardrb",
@@ -45,7 +43,7 @@ return {
     },
   },
   {
-    "williamboman/mason.nvim",
+    "mason-org/mason.nvim",
     opts = { ensure_installed = { "erb-formatter", "erb-lint" } },
   },
   {
@@ -64,7 +62,7 @@ return {
     opts = {
       formatters_by_ft = {
         ruby = { formatter },
-        eruby = { "erb-format" },
+        eruby = { "erb_format" },
       },
     },
   },

@@ -1,3 +1,4 @@
+local Meta = require("lazy.core.meta")
 local Plugin = require("lazy.core.plugin")
 
 ---@class lazyvim.util.plugin
@@ -5,6 +6,7 @@ local M = {}
 
 ---@type string[]
 M.core_imports = {}
+M.handle_defaults = true
 
 M.lazy_file_events = { "BufReadPost", "BufNewFile", "BufWritePre" }
 
@@ -15,6 +17,7 @@ M.deprecated_extras = {
   ["lazyvim.plugins.extras.ui.dashboard"] = "`dashboard.nvim` is now the default **LazyVim** starter.",
   ["lazyvim.plugins.extras.coding.native_snippets"] = "Native snippets are now the default for **Neovim >= 0.10**",
   ["lazyvim.plugins.extras.ui.treesitter-rewrite"] = "Disabled `treesitter-rewrite` extra for now. Not ready yet.",
+  ["lazyvim.plugins.extras.ui.treesitter-main"] = "the `nvim-treesitter` main branch is now used by default",
   ["lazyvim.plugins.extras.coding.mini-ai"] = "`mini.ai` is now a core LazyVim plugin (again)",
   ["lazyvim.plugins.extras.lazyrc"] = "local spec files are now a lazy.nvim feature",
   ["lazyvim.plugins.extras.editor.trouble-v3"] = "Trouble v3 has been merged in main",
@@ -22,6 +25,10 @@ M.deprecated_extras = {
   because it's causing too many issues.
   Either use `basedpyright`, or copy the [old extra](https://github.com/LazyVim/LazyVim/blob/c1f5fcf9c7ed2659c9d5ac41b3bb8a93e0a3c6a0/lua/lazyvim/plugins/extras/lang/python-semshi.lua#L1) to your own config.
   ]],
+}
+M.renamed_extras = {
+  ["lazyvim.plugins.extras.lang.omnisharp"] = "lazyvim.plugins.extras.lang.dotnet",
+  ["lazyvim.plugins.extras.formatting.biome"] = "lazyvim.plugins.extras.lang.typescript.biome",
 }
 
 M.deprecated_modules = {}
@@ -34,6 +41,9 @@ M.renames = {
   ["romgrk/nvim-treesitter-context"] = "nvim-treesitter/nvim-treesitter-context",
   ["glepnir/dashboard-nvim"] = "nvimdev/dashboard-nvim",
   ["markdown.nvim"] = "render-markdown.nvim",
+  ["williamboman/mason.nvim"] = "mason-org/mason.nvim",
+  ["williamboman/mason-lspconfig.nvim"] = "mason-org/mason-lspconfig.nvim",
+  ["ggandor/leap.nvim"] = "https://codeberg.org/andyg/leap.nvim.git",
 }
 
 function M.save_core()
@@ -71,31 +81,6 @@ function M.extra_idx(name)
 end
 
 function M.lazy_file()
-  -- This autocmd will only trigger when a file was loaded from the cmdline.
-  -- It will render the file as quickly as possible.
-  vim.api.nvim_create_autocmd("BufReadPost", {
-    once = true,
-    callback = function(event)
-      -- Skip if we already entered vim
-      if vim.v.vim_did_enter == 1 then
-        return
-      end
-
-      -- Try to guess the filetype (may change later on during Neovim startup)
-      local ft = vim.filetype.match({ buf = event.buf })
-      if ft then
-        -- Add treesitter highlights and fallback to syntax
-        local lang = vim.treesitter.language.get_lang(ft)
-        if not (lang and pcall(vim.treesitter.start, event.buf, lang)) then
-          vim.bo[event.buf].syntax = ft
-        end
-
-        -- Trigger early redraw
-        vim.cmd([[redraw]])
-      end
-    end,
-  })
-
   -- Add support for the LazyFile event
   local Event = require("lazy.core.handler.event")
 
@@ -104,20 +89,77 @@ function M.lazy_file()
 end
 
 function M.fix_imports()
+  local defaults ---@type table<string, LazyVimDefault>
   Plugin.Spec.import = LazyVim.inject.args(Plugin.Spec.import, function(_, spec)
-    local dep = M.deprecated_extras[spec and spec.import]
+    if M.handle_defaults and LazyVim.config.json.loaded then
+      -- extra disabled by defaults?
+      defaults = defaults or LazyVim.config.get_defaults()
+      local def = defaults[spec.import]
+      if def and def.enabled == false then
+        return false
+      end
+    end
+    local rename = M.renamed_extras[spec.import]
+    if rename then
+      LazyVim.warn(
+        ("The extra `%s` was renamed to `%s`.\nPlease update your config for `%s`"):format(
+          spec.import,
+          rename,
+          spec.importing or "LazyVim"
+        ),
+        { title = "LazyVim" }
+      )
+      spec.import = rename
+    end
+    local dep = M.deprecated_extras[spec.import]
     if dep then
       dep = dep .. "\n" .. "Please remove the extra from `lazyvim.json` to hide this warning."
       LazyVim.warn(dep, { title = "LazyVim", once = true, stacktrace = true, stacklevel = 6 })
       return false
     end
+
+    local modname = spec.import
+    if type(modname) == "string" and vim.startswith(modname, "lazyvim.plugins.extras.") then
+      M.single_import(spec)
+    end
   end)
 end
 
+---@param spec LazySpecImport
+function M.single_import(spec)
+  local modname = spec.import
+  if type(modname) ~= "string" then
+    return
+  end
+  spec.name = modname
+  spec.import = function()
+    local modinfo = vim.loader.find(modname)[1]
+    local modpath = modinfo and modinfo.modpath
+    local mod, err = loadfile(modpath)
+    if mod then
+      local ret, foo = mod()
+      if foo then
+        return nil, "Spec module returned more than one value. Expected a single value."
+      end
+      return ret
+    else
+      return nil, err
+    end
+  end
+end
+
 function M.fix_renames()
-  Plugin.Spec.add = LazyVim.inject.args(Plugin.Spec.add, function(self, plugin)
+  ---@param plugin LazyPluginSpec
+  Meta.add = LazyVim.inject.args(Meta.add, function(self, plugin)
     if type(plugin) == "table" then
-      if M.renames[plugin[1]] then
+      local name = plugin[1]
+      if not name then
+        return
+      end
+      if name:find("echasnovski") then
+        M.renames[name] = name:gsub("echasnovski", "nvim-mini")
+      end
+      if M.renames[name] then
         LazyVim.warn(
           ("Plugin `%s` was renamed to `%s`.\nPlease update your config for `%s`"):format(
             plugin[1],
@@ -126,7 +168,7 @@ function M.fix_renames()
           ),
           { title = "LazyVim" }
         )
-        plugin[1] = M.renames[plugin[1]]
+        plugin[1] = M.renames[name]
       end
     end
   end)

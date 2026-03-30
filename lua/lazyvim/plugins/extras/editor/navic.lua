@@ -7,13 +7,11 @@ return {
     lazy = true,
     init = function()
       vim.g.navic_silence = true
-      LazyVim.lsp.on_attach(function(client, buffer)
-        if client.supports_method("textDocument/documentSymbol") then
-          require("nvim-navic").attach(client, buffer)
-        end
-      end)
     end,
     opts = function()
+      Snacks.util.lsp.on({ method = "textDocument/documentSymbol" }, function(buffer, client)
+        require("nvim-navic").attach(client, buffer)
+      end)
       return {
         separator = " ",
         highlight = true,
@@ -30,14 +28,7 @@ return {
     optional = true,
     opts = function(_, opts)
       if not vim.g.trouble_lualine then
-        table.insert(opts.sections.lualine_c, {
-          function()
-            return require("nvim-navic").get_location()
-          end,
-          cond = function()
-            return package.loaded["nvim-navic"] and require("nvim-navic").is_available()
-          end,
-        })
+        table.insert(opts.sections.lualine_c, { "navic", color_correction = "dynamic" })
       end
     end,
   },

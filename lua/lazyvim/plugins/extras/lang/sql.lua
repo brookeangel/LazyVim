@@ -28,6 +28,11 @@ end
 
 local sql_ft = { "sql", "mysql", "plsql" }
 
+-- disable nvim default `sql_completion` plugin to be compatible with blink.cmp's omni
+-- while still showing some keywords from the syntax autocomplete sources
+vim.g.omni_sql_default_compl_type = "syntax"
+vim.g.loaded_sql_completion = true
+
 return {
   recommended = function()
     return LazyVim.extras.wants({
@@ -48,19 +53,21 @@ return {
       vim.api.nvim_create_autocmd("FileType", {
         pattern = sql_ft,
         callback = function()
-          local cmp = require("cmp")
+          if LazyVim.has_extra("coding.nvim-cmp") then
+            local cmp = require("cmp")
 
-          -- global sources
-          ---@param source cmp.SourceConfig
-          local sources = vim.tbl_map(function(source)
-            return { name = source.name }
-          end, cmp.get_config().sources)
+            -- global sources
+            ---@param source cmp.SourceConfig
+            local sources = vim.tbl_map(function(source)
+              return { name = source.name }
+            end, cmp.get_config().sources)
 
-          -- add vim-dadbod-completion source
-          table.insert(sources, { name = "vim-dadbod-completion" })
+            -- add vim-dadbod-completion source
+            table.insert(sources, { name = "vim-dadbod-completion" })
 
-          -- update sources for the current buffer
-          cmp.setup.buffer({ sources = sources })
+            -- update sources for the current buffer
+            cmp.setup.buffer({ sources = sources })
+          end
         end,
       })
     end,
@@ -122,9 +129,26 @@ return {
     end,
   },
 
+  -- blink.cmp integration
+  {
+    "saghen/blink.cmp",
+    optional = true,
+    opts = {
+      sources = {
+        default = { "dadbod" },
+        providers = {
+          dadbod = { name = "Dadbod", module = "vim_dadbod_completion.blink" },
+        },
+      },
+    },
+    dependencies = {
+      "kristijanhusak/vim-dadbod-completion",
+    },
+  },
+
   -- Linters & formatters
   {
-    "williamboman/mason.nvim",
+    "mason-org/mason.nvim",
     opts = { ensure_installed = { "sqlfluff" } },
   },
   {

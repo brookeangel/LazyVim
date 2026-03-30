@@ -65,7 +65,7 @@ function M.get()
     if root then
       LazyVim.walk(root, function(path, name, type)
         if (type == "file" or type == "link") and name:match("%.lua$") then
-          name = path:sub(#root + 2, -5):gsub("/", ".")
+          name = path:sub(#root + 2, -5):gsub("/", "."):gsub("%.init$", "")
           local ok, extra = pcall(M.get_extra, source, source.module .. "." .. name)
           if ok then
             extras[#extras + 1] = extra
@@ -83,6 +83,7 @@ end
 ---@param modname string
 ---@param source LazyExtraSource
 function M.get_extra(source, modname)
+  LazyVim.plugin.handle_defaults = false
   local enabled = vim.tbl_contains(M.state, modname)
   local spec = Plugin.Spec.new(nil, { optional = true, pkg = false })
   spec:parse({ import = modname })
@@ -112,6 +113,13 @@ function M.get_extra(source, modname)
     recommended = recommended() or false
   elseif type(recommended) == "table" then
     recommended = M.wants(recommended)
+  end
+
+  -- language extras that are disabled because a conflict with another extra is enabled are not recommended
+  local defaults = LazyVim.config.get_defaults()
+  local def = defaults[modname]
+  if def and def.enabled == false and vim.startswith(modname, "lazyvim.plugins.extras.lang.") then
+    recommended = false
   end
 
   ---@type LazyExtra
@@ -248,6 +256,9 @@ end
 
 ---@param extra LazyExtra
 function X:extra(extra)
+  local defaults = LazyVim.config.get_defaults()
+  local def = defaults[extra.module]
+  local origin = def and (def.origin or "user") or nil
   if not extra.managed then
     ---@type LazyExtra[]
     local parents = {}
@@ -263,7 +274,7 @@ function X:extra(extra)
       self:diagnostic({
         message = "Required by " .. table.concat(pp, ", "),
       })
-    elseif vim.tbl_contains(LazyVim.plugin.core_imports, extra.module) then
+    elseif vim.tbl_contains(LazyVim.plugin.core_imports, extra.module) or origin == "default" then
       self:diagnostic({
         message = "This extra is included by default",
       })

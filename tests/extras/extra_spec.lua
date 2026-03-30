@@ -1,9 +1,13 @@
 ---@module 'luassert'
+---@module 'lazy'
 
 local Icons = require("mini.icons")
 
 local Plugin = require("lazy.core.plugin")
 _G.LazyVim = require("lazyvim.util")
+require("lazyvim.config")
+LazyVim.config.get_defaults()
+LazyVim.plugin.setup()
 
 describe("Extra", function()
   local Config = require("lazy.core.config")
@@ -26,7 +30,15 @@ describe("Extra", function()
     return not vim.tbl_contains(ignore, extra.modname)
   end, extras)
 
-  local lsp_to_pkg = require("mason-lspconfig.mappings.server").lspconfig_to_package
+  require("mason").setup()
+  local mr = require("mason-registry")
+  mr.refresh()
+
+  local lsp_to_pkg = {}
+  lsp_to_pkg = require("mason-lspconfig.mappings").get_mason_map().lspconfig_to_package
+  it("can get lspconfig to package map", function()
+    assert(not vim.tbl_isempty(lsp_to_pkg), "Could not get lspconfig to package map")
+  end)
 
   local tsspec = Plugin.Spec.new({
     import = "lazyvim.plugins.treesitter",
@@ -44,7 +56,7 @@ describe("Extra", function()
         local mod = require(extra.modname)
         assert.is_not_nil(mod)
         local spec = Plugin.Spec.new({
-          { "williamboman/mason.nvim", opts = { ensure_installed = {} } },
+          { "mason-org/mason.nvim", opts = { ensure_installed = {} } },
           { "nvim-treesitter/nvim-treesitter", opts = { ensure_installed = {} } },
           mod,
         }, { optional = true })
@@ -60,10 +72,23 @@ describe("Extra", function()
 
       local mod = require(extra.modname)
       local spec = Plugin.Spec.new({
-        { "williamboman/mason.nvim", opts = { ensure_installed = {} } },
+        { "mason-org/mason.nvim", opts = { ensure_installed = {} } },
         { "nvim-treesitter/nvim-treesitter", opts = { ensure_installed = {} } },
         mod,
       }, { optional = true })
+
+      it("it has no renamed plugins", function()
+        for _, p in pairs(spec.plugins) do
+          local short_url = p[1]
+          if short_url then
+            assert(
+              not LazyVim.plugin.renames[short_url],
+              "Plugin " .. short_url .. " has been renamed to " .. (LazyVim.plugin.renames[short_url] or "")
+            )
+          end
+        end
+      end)
+
       local lspconfig = spec.plugins["nvim-lspconfig"]
       if lspconfig then
         it("does not install LSP servers with mason.nvim", function()
@@ -71,8 +96,13 @@ describe("Extra", function()
           local mason = spec.plugins["mason.nvim"]
           local mason_opts = Plugin.values(mason, "opts", false)
 
-          for lsp in pairs(lspconfig_opts.servers or {}) do
+          for lsp, lsp_opts in pairs(lspconfig_opts.servers or {}) do
             local lsp_pkg = lsp_to_pkg[lsp]
+            -- Skip if the LSP server is disabled in the config since mason.nvim won't install it
+            -- and it might still be used for conform.nvim or nvim-lint, etc.
+            if type(lsp_opts) == "table" and lsp_opts.enabled == false then
+              lsp_pkg = false
+            end
             assert(
               not (lsp_pkg and vim.tbl_contains(mason_opts.ensure_installed, lsp_pkg)),
               "LSP server "

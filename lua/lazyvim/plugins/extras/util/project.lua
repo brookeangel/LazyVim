@@ -91,6 +91,15 @@ return {
     event = "VeryLazy",
     config = function(_, opts)
       require("project_nvim").setup(opts)
+      local history = require("project_nvim.utils.history")
+      history.delete_project = function(project)
+        for k, v in pairs(history.recent_projects) do
+          if v == project.value then
+            history.recent_projects[k] = nil
+            return
+          end
+        end
+      end
       LazyVim.on_load("telescope.nvim", function()
         require("telescope").load_extension("projects")
       end)
@@ -117,7 +126,7 @@ return {
     "goolord/alpha-nvim",
     optional = true,
     opts = function(_, dashboard)
-      local button = dashboard.button("p", " " .. " Projects", pick)
+      local button = dashboard.button("P", " " .. " Projects (util.project)", pick)
       button.opts.hl = "AlphaButtons"
       button.opts.hl_shortcut = "AlphaShortcut"
       table.insert(dashboard.section.buttons.val, 4, button)
@@ -125,12 +134,12 @@ return {
   },
 
   {
-    "echasnovski/mini.starter",
+    "nvim-mini/mini.starter",
     optional = true,
     opts = function(_, opts)
       local items = {
         {
-          name = "Projects",
+          name = "Projects (util.project)",
           action = pick,
           section = string.rep(" ", 22) .. "Telescope",
         },
@@ -143,17 +152,33 @@ return {
     "nvimdev/dashboard-nvim",
     optional = true,
     opts = function(_, opts)
+      if not vim.tbl_get(opts, "config", "center") then
+        return
+      end
       local projects = {
         action = pick,
-        desc = " Projects",
+        desc = " Projects (util.project)",
         icon = " ",
-        key = "p",
+        key = "P",
       }
 
       projects.desc = projects.desc .. string.rep(" ", 43 - #projects.desc)
       projects.key_format = "  %s"
 
       table.insert(opts.config.center, 3, projects)
+    end,
+  },
+
+  {
+    "folke/snacks.nvim",
+    optional = true,
+    opts = function(_, opts)
+      table.insert(opts.dashboard.preset.keys, 3, {
+        action = pick,
+        desc = "Projects (util.project)",
+        icon = " ",
+        key = "P",
+      })
     end,
   },
 }

@@ -35,10 +35,10 @@ return {
       },
       setup = {
         angularls = function()
-          LazyVim.lsp.on_attach(function(client)
+          Snacks.util.lsp.on({ name = "angularls" }, function(_, client)
             --HACK: disable angular renaming capability due to duplicate rename popping up
             client.server_capabilities.renameProvider = false
-          end, "angularls")
+          end)
         end,
       },
     },
@@ -55,6 +55,17 @@ return {
           enableForWorkspaceTypeScriptVersions = false,
         },
       })
+    end,
+  },
+
+  -- formatting
+  {
+    "conform.nvim",
+    opts = function(_, opts)
+      if LazyVim.has_extra("formatting.prettier") then
+        opts.formatters_by_ft = opts.formatters_by_ft or {}
+        opts.formatters_by_ft.htmlangular = { "prettier" }
+      end
     end,
   },
 }

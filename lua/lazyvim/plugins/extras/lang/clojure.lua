@@ -21,13 +21,13 @@ return {
     },
     opts = function(_, opts)
       if type(opts.sources) == "table" then
-        vim.list_extend(opts.sources, { name = "clojure" })
+        vim.list_extend(opts.sources, { name = "conjure" })
       end
     end,
   },
 
   -- Add s-exp mappings
-  { "PaterJason/nvim-treesitter-sexp", opts = {}, event = "LazyFile" },
+  { "julienvincent/nvim-paredit", opts = {}, event = "LazyFile" },
 
   -- Colorize the output of the log buffer
   {
@@ -52,7 +52,6 @@ return {
     event = "LazyFile",
     config = function(_, _)
       require("conjure.main").main()
-      require("conjure.mapping")["on-filetype"]()
     end,
     init = function()
       -- print color codes if baleia.nvim is available
@@ -76,13 +75,13 @@ return {
           end
 
           vim.keymap.set(
-            { "n", "v" },
+            { "n", "x" },
             "[c",
             "<CMD>call search('^; -\\+$', 'bw')<CR>",
             { silent = true, buffer = true, desc = "Jumps to the begining of previous evaluation output." }
           )
           vim.keymap.set(
-            { "n", "v" },
+            { "n", "x" },
             "]c",
             "<CMD>call search('^; -\\+$', 'w')<CR>",
             { silent = true, buffer = true, desc = "Jumps to the begining of next evaluation output." }
