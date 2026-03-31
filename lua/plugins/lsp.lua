@@ -18,7 +18,10 @@ return {
   {
     "pmizio/typescript-tools.nvim",
     opts = {
-      settings = { expose_as_code_action = { "add_missing_imports" } },
+      settings = {
+        expose_as_code_action = { "add_missing_imports" },
+        documentRangeFormattingProvider = false,
+      },
       dependencies = { "nvim-lua/plenary.nvim" },
     },
   },
