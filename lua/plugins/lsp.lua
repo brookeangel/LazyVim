@@ -18,9 +18,12 @@ return {
   {
     "pmizio/typescript-tools.nvim",
     opts = {
+      on_attach = function(client)
+        client.server_capabilities.documentFormattingProvider = false
+        client.server_capabilities.documentRangeFormattingProvider = false
+      end,
       settings = {
         expose_as_code_action = { "add_missing_imports" },
-        documentRangeFormattingProvider = false,
       },
       dependencies = { "nvim-lua/plenary.nvim" },
     },
